@@ -1,39 +1,74 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { IoMdSearch, IoMdCall, IoMdChatbubbles } from 'react-icons/io';
-import { MdOutlineLightbulb } from 'react-icons/md'; // For AI suggestions
-
+import { IoMdSearch } from 'react-icons/io';
+import { MdOutlineLightbulb, MdCallMissed, MdMessage } from 'react-icons/md';
+import NavBar from '../navbar/navbar'; //
 interface Contact {
   id: string;
   name: string;
   avatar: string;
-  lastInteraction?: number; // Unix timestamp for sorting frequency
-  interactionCount?: number; // Higher count for more frequent
+  lastInteraction?: number;
+  interactionCount?: number;
 }
 
-interface RecentMessageBoxProps {
-  senderName: string;
-  senderAvatar: string;
-  messageContent: string;
+interface RecentNotification {
+  id: string;
+  contactId: string;
+  type: 'message' | 'missedCall';
+  content: string;
+  timestamp: number;
 }
 
-const RecentMessageBox: React.FC<RecentMessageBoxProps> = ({ senderName, senderAvatar, messageContent }) => {
+const MOCK_CONTACTS: { [key: string]: Contact } = {
+  'jeff-johnson': { id: 'jeff-johnson', name: 'Jeff Johnson', avatar: 'https://via.placeholder.com/150/00CED1/FFFFFF?text=JJ' },
+  'kate-madison': { id: 'kate-madison', name: 'Kate Madison', avatar: 'https://via.placeholder.com/150/40E0D0/FFFFFF?text=KM' },
+  'john-doe': { id: 'john-doe', name: 'John Doe', avatar: 'https://via.placeholder.com/150/7FFFD4/000000?text=JD' },
+  'jane-smith': { id: 'jane-smith', name: 'Jane Smith', avatar: 'https://via.placeholder.com/150/20B2AA/FFFFFF?text=JS' },
+  'tim-brown': { id: 'tim-brown', name: 'Tim Brown', avatar: 'https://via.placeholder.com/150/66CDAA/000000?text=TB' },
+  'kelly-williams': { id: 'kelly-williams', name: 'Kelly Williams', avatar: 'https://via.placeholder.com/150/008080/FFFFFF?text=KW' },
+  'rene-wells': { id: 'rene-wells', name: 'Rene Wells', avatar: 'https://via.placeholder.com/150/4682B4/FFFFFF?text=RW' },
+  'jack-richards': { id: 'jack-richards', name: 'Jack Richards', avatar: 'https://via.placeholder.com/150/5F9EA0/FFFFFF?text=JR' },
+  'katherine-moss': { id: 'katherine-moss', name: 'Katherine Moss', avatar: 'https://via.placeholder.com/150/87CEEB/000000?text=KM' },
+};
+
+interface RecentNotificationBoxProps {
+  notification: RecentNotification;
+  contact: Contact;
+}
+
+const RecentNotificationBox: React.FC<RecentNotificationBoxProps> = ({ notification, contact }) => {
+  const navigate = useNavigate();
+
+  const handleBoxClick = () => {
+    if (notification.type === 'message') {
+      navigate(`/messages/${contact.id}`);
+    } else if (notification.type === 'missedCall') {
+      navigate(`/voice-call`, { state: { contactId: contact.id } });
+    }
+  };
+
   return (
     <div
-      className="relative w-full h-32 rounded-xl overflow-hidden shadow-lg mb-6 flex items-center justify-start p-4"
+      className="relative flex-shrink-0 w-64 h-32 rounded-xl overflow-hidden shadow-lg mr-4 cursor-pointer"
       style={{
-        backgroundImage: `url(${senderAvatar})`,
+        backgroundImage: `url(${contact.avatar})`,
         backgroundSize: 'cover',
         backgroundPosition: 'center',
       }}
+      onClick={handleBoxClick}
     >
-      {/* Glassy Overlay */}
-      <div className="absolute inset-0 bg-black/30 backdrop-blur-sm z-10"></div>
+      <div className="absolute inset-y-0 left-0 w-2/3 bg-white/15 backdrop-blur-sm rounded-l-xl z-10"></div>
 
-      {/* Content */}
-      <div className="relative z-20 text-white flex flex-col justify-center h-full">
-        <h3 className="text-xl font-bold">{senderName}</h3>
-        <p className="text-sm opacity-90 mt-1">{messageContent}</p>
+      <div className="relative z-20 text-white flex flex-col justify-center h-full px-4">
+        <h3 className="text-lg font-bold">{contact.name}</h3>
+        <p className="text-sm opacity-90 mt-0.5 flex items-center">
+          {notification.type === 'message' ? (
+            <MdMessage size={16} className="mr-1 text-white/80" />
+          ) : (
+            <MdCallMissed size={16} className="mr-1 text-red-300" />
+          )}
+          {notification.content}
+        </p>
       </div>
     </div>
   );
@@ -45,12 +80,11 @@ interface AISuggestionBoxProps {
 
 const AISuggestionBox: React.FC<AISuggestionBoxProps> = ({ onDismiss }) => {
   return (
-    <div className="relative w-full rounded-xl bg-gradient-to-br from-purple-500 to-indigo-600 p-4 text-white shadow-lg mb-6 flex items-start space-x-3">
+    <div className="relative w-full rounded-xl bg-gradient-to-br from-cyan-500 to-teal-600 p-4 text-white shadow-lg mb-6 flex items-start space-x-3">
       <MdOutlineLightbulb size={28} className="flex-shrink-0 mt-1" />
       <div>
         <h3 className="font-semibold text-lg">AI Suggestion: Reconnect!</h3>
         <p className="text-sm opacity-90 mt-1">It looks like you haven't chatted with some contacts recently. How about sending a quick hello?</p>
-        {/* Optional: Add a button to navigate to a "reconnect" list */}
         <button onClick={onDismiss} className="absolute top-2 right-2 text-white/80 hover:text-white transition-colors">
           &times;
         </button>
@@ -59,66 +93,62 @@ const AISuggestionBox: React.FC<AISuggestionBoxProps> = ({ onDismiss }) => {
   );
 };
 
-
 const ContactsPage: React.FC = () => {
   const navigate = useNavigate();
 
-  // Simulated AI state for showing suggestions
-  const [showAISuggestion, setShowAISuggestion] = useState(true);
-
-  // Mock contact data with simulated interaction history
-  const [contacts, setContacts] = useState<Contact[]>([
-    { id: 'jeff-johnson', name: 'Jeff Johnson', avatar: 'https://via.placeholder.com/150/D1E9E9/9FC1C1?text=JJ', lastInteraction: Date.now() - 1000 * 60 * 5, interactionCount: 10 }, // 5 mins ago
-    { id: 'kate-madison', name: 'Kate Madison', avatar: 'https://via.placeholder.com/150/E8D2E1/B98FA5?text=KM', lastInteraction: Date.now() - 1000 * 60 * 60 * 24 * 3, interactionCount: 5 }, // 3 days ago
-    { id: 'john-doe', name: 'John Doe', avatar: 'https://via.placeholder.com/150/A0B9D8/FFFFFF?text=JD', lastInteraction: Date.now() - 1000 * 60 * 60 * 24 * 7, interactionCount: 2 }, // 7 days ago
-    { id: 'jane-smith', name: 'Jane Smith', avatar: 'https://via.placeholder.com/150/F0C4B8/FFFFFF?text=JS', lastInteraction: Date.now() - 1000 * 60 * 60 * 24 * 1, interactionCount: 8 }, // 1 day ago
-    { id: 'tim-brown', name: 'Tim Brown', avatar: 'https://via.placeholder.com/150/B8F0C4/FFFFFF?text=TB', lastInteraction: undefined, interactionCount: 0 }, // No recent interaction
-    { id: 'kelly-williams', name: 'Kelly Williams', avatar: 'https://via.placeholder.com/150/D1E9E9/9FC1C1?text=KW', lastInteraction: Date.now() - 1000 * 60 * 30, interactionCount: 7 }, // 30 mins ago
-    { id: 'rene-wells', name: 'Rene Wells', avatar: 'https://via.placeholder.com/150/A0B9D8/FFFFFF?text=RW', lastInteraction: Date.now() - 1000 * 60 * 60 * 24 * 10, interactionCount: 1 }, // 10 days ago
-    { id: 'jack-richards', name: 'Jack Richards', avatar: 'https://via.placeholder.com/150/F0C4B8/FFFFFF?text=JR', lastInteraction: undefined, interactionCount: 0 },
-    { id: 'katherine-moss', name: 'Katherine Moss', avatar: 'https://via.placeholder.com/150/B8F0C4/FFFFFF?text=KM', lastInteraction: Date.now() - 1000 * 60 * 60 * 2, interactionCount: 6 }, // 2 hours ago
-  ]);
-
-  // Simulate a recent message sender for the top box
-  const [latestMessage, setLatestMessage] = useState({
-    senderId: 'jeff-johnson',
-    content: 'Hey, are you free for a quick call?',
+  const [contacts, setContacts] = useState<Contact[]>(() => {
+    const initialContacts = Object.values(MOCK_CONTACTS);
+    initialContacts.find(c => c.id === 'jeff-johnson')!.lastInteraction = Date.now();
+    initialContacts.find(c => c.id === 'jeff-johnson')!.interactionCount = 10;
+    initialContacts.find(c => c.id === 'kate-madison')!.lastInteraction = Date.now() - 1000 * 60 * 60 * 24 * 3;
+    initialContacts.find(c => c.id === 'kate-madison')!.interactionCount = 5;
+    initialContacts.find(c => c.id === 'jane-smith')!.lastInteraction = Date.now() - 1000 * 60 * 60 * 2;
+    initialContacts.find(c => c.id === 'jane-smith')!.interactionCount = 8;
+    initialContacts.find(c => c.id === 'kelly-williams')!.lastInteraction = Date.now() - 1000 * 60 * 30;
+    initialContacts.find(c => c.id === 'kelly-williams')!.interactionCount = 7;
+    return initialContacts;
   });
 
-  // Derived state for the recent message box data
-  const recentMessageSender = useMemo(() => {
-    const senderContact = contacts.find(c => c.id === latestMessage.senderId);
-    return senderContact ? {
-      senderName: senderContact.name,
-      senderAvatar: senderContact.avatar,
-      messageContent: latestMessage.content,
-    } : null;
-  }, [contacts, latestMessage]);
+  const [recentNotifications, setRecentNotifications] = useState<RecentNotification[]>([
+    { id: 'notif1', contactId: 'jeff-johnson', type: 'message', content: 'Hey, are you free for a quick call?', timestamp: Date.now() - 1000 * 60 * 2 },
+    { id: 'notif2', contactId: 'kate-madison', type: 'missedCall', content: 'Missed Call', timestamp: Date.now() - 1000 * 60 * 5 },
+    { id: 'notif3', contactId: 'jane-smith', type: 'message', content: 'Got your message!', timestamp: Date.now() - 1000 * 60 * 10 },
+    { id: 'notif4', contactId: 'tim-brown', type: 'message', content: 'Long time no see!', timestamp: Date.now() - 1000 * 60 * 15 },
+  ]);
 
+  const [showAISuggestion, setShowAISuggestion] = useState(false);
 
-  // Sort contacts based on interaction frequency or alphabetically
+  useEffect(() => {
+    const oldestInteractionTime = contacts.reduce((minTime, contact) => {
+      return contact.lastInteraction && contact.lastInteraction < minTime ? contact.lastInteraction : minTime;
+    }, Date.now());
+
+    const hasUninteractedContacts = contacts.some(c => !c.lastInteraction || c.interactionCount === 0);
+
+    if (Date.now() - oldestInteractionTime > 1000 * 60 * 60 * 24 * 7 && hasUninteractedContacts) {
+      setShowAISuggestion(true);
+    } else {
+      setShowAISuggestion(false);
+    }
+  }, [contacts]);
+
   const sortedContacts = useMemo(() => {
     return [...contacts].sort((a, b) => {
-      // Prioritize contacts with recent interactions
       if (a.lastInteraction && b.lastInteraction) {
-        return b.lastInteraction - a.lastInteraction; // More recent (higher timestamp) first
+        return b.lastInteraction - a.lastInteraction;
       }
-      if (a.lastInteraction) return -1; // a has interaction, b doesn't, so a comes first
-      if (b.lastInteraction) return 1;  // b has interaction, a doesn't, so b comes first
+      if (a.lastInteraction) return -1;
+      if (b.lastInteraction) return 1;
 
-      // If no recent interaction, sort by interactionCount (higher is more frequent)
       if (a.interactionCount !== undefined && b.interactionCount !== undefined) {
         if (b.interactionCount !== a.interactionCount) {
           return b.interactionCount - a.interactionCount;
         }
       }
-
-      // Fallback to alphabetical if no recent interaction or interactionCount difference
       return a.name.localeCompare(b.name);
     });
   }, [contacts]);
 
-  // Simulate updating interaction data (e.g., after a call or chat)
   const updateInteraction = useCallback((contactId: string) => {
     setContacts(prevContacts =>
       prevContacts.map(contact =>
@@ -133,25 +163,18 @@ const ContactsPage: React.FC = () => {
     );
   }, []);
 
-  // Handlers for navigation
-  const handleCall = useCallback((contactId: string) => {
-    updateInteraction(contactId);
-    navigate('/voice-call', { state: { contactId: contactId } });
-  }, [navigate, updateInteraction]);
-
-  const handleChat = useCallback((contactId: string) => {
+  const handleChatFromRowClick = useCallback((contactId: string) => {
     updateInteraction(contactId);
     navigate(`/messages/${contactId}`);
   }, [navigate, updateInteraction]);
 
-  const handleContactClick = useCallback((contactId: string) => {
+  const handleContactCardClick = useCallback((e: React.MouseEvent, contactId: string) => {
+    e.stopPropagation(); // Crucially stop propagation here
     navigate(`/contact-card/${contactId}`);
   }, [navigate]);
 
-
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col">
-      {/* Header */}
+    <div className="min-h-screen bg-white flex flex-col">
       <div className="bg-white shadow-sm p-4 pb-3">
         <div className="flex items-center justify-between mb-4">
           <h1 className="text-3xl font-bold text-gray-900">Contacts</h1>
@@ -161,55 +184,55 @@ const ContactsPage: React.FC = () => {
         </div>
       </div>
 
-      {/* Main Content Area */}
-      <div className="flex-grow p-4 overflow-y-auto">
-        {/* AI Suggestion Box */}
-        {showAISuggestion && (
+      <div className="flex-grow p-4 overflow-y-auto bg-gray-50">
+        {showAISuggestion ? (
           <AISuggestionBox onDismiss={() => setShowAISuggestion(false)} />
+        ) : (
+          recentNotifications.length > 0 && (
+            <div className="mb-6">
+              <h2 className="text-lg font-semibold text-gray-700 mb-3">Recent Notifications</h2>
+              <div className="flex overflow-x-auto whitespace-nowrap pb-2 -mr-4">
+                {recentNotifications.map(notification => {
+                  const contact = MOCK_CONTACTS[notification.contactId];
+                  return contact ? (
+                    <RecentNotificationBox key={notification.id} notification={notification} contact={contact} />
+                  ) : null;
+                })}
+              </div>
+            </div>
+          )
         )}
 
-        {/* "Just Sent You a Text" Box */}
-        {recentMessageSender && (
-          <RecentMessageBox
-            senderName={recentMessageSender.senderName}
-            senderAvatar={recentMessageSender.senderAvatar}
-            messageContent={recentMessageSender.messageContent}
-          />
-        )}
-
-        {/* Contact List */}
         <h2 className="text-lg font-semibold text-gray-700 mb-3 mt-4">All Contacts</h2>
         <div className="bg-white rounded-lg shadow-sm divide-y divide-gray-100">
           {sortedContacts.map((contact) => (
-            <div key={contact.id} className="flex items-center justify-between p-3">
+            <div
+              key={contact.id}
+              className="flex items-center p-3 hover:bg-cyan-50 transition-colors cursor-pointer"
+              onClick={() => handleChatFromRowClick(contact.id)} // Click anywhere on the row for messages
+            >
+              {/* This inner div contains the clickable elements for the contact card */}
               <div
-                className="flex items-center flex-grow cursor-pointer"
-                onClick={() => handleContactClick(contact.id)}
+                className="flex items-center flex-grow"
+                // The stopPropagation should be inside the handler for the specific elements
               >
                 <img
                   src={contact.avatar}
                   alt={contact.name}
-                  className="w-12 h-12 rounded-full object-cover mr-3"
+                  className="w-12 h-12 rounded-full object-cover mr-3 border-2 border-cyan-300 cursor-pointer"
+                  onClick={(e) => handleContactCardClick(e, contact.id)} // Click image for contact card
                 />
-                <span className="font-medium text-gray-900">{contact.name}</span>
-              </div>
-              <div className="flex space-x-3">
-                <button
-                  onClick={() => handleCall(contact.id)}
-                  className="p-2 rounded-full text-blue-600 hover:bg-blue-100 active:scale-95 transition-transform"
+                <span
+                  className="font-medium text-gray-900 cursor-pointer"
+                  onClick={(e) => handleContactCardClick(e, contact.id)} // Click name for contact card
                 >
-                  <IoMdCall size={22} />
-                </button>
-                <button
-                  onClick={() => handleChat(contact.id)}
-                  className="p-2 rounded-full text-purple-600 hover:bg-purple-100 active:scale-95 transition-transform"
-                >
-                  <IoMdChatbubbles size={22} />
-                </button>
+                  {contact.name}
+                </span>
               </div>
             </div>
           ))}
         </div>
+        <NavBar/>
       </div>
     </div>
   );

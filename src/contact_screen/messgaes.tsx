@@ -15,9 +15,13 @@ const MessagePage: React.FC<MessagePageProps> = () => {
   const contactStatus = "Active Now"; // Placeholder
 
   // Function to handle navigating to the call page
-  const handleCallClick = () => {
+  const handleVideoCallClick = () => {
     console.log(`Initiating call with ${contactName}`);
     navigate('/video-call'); // Navigate to the video call page
+  };
+  const handleVoiceCallClick = () => {
+    console.log(`Initiating call with ${contactName}`);
+    navigate('/voice-call'); // Navigate to the video call page
   };
 
   return (
@@ -41,13 +45,13 @@ const MessagePage: React.FC<MessagePageProps> = () => {
           <IoMdCall
             size={24}
             className="text-gray-600 cursor-pointer active:scale-95 transition-transform duration-100"
-            onClick={handleCallClick}
+            onClick={handleVoiceCallClick}
           />
           {/* Video Call Icon - now clickable */}
           <IoMdVideocam
             size={24}
             className="text-gray-600 cursor-pointer active:scale-95 transition-transform duration-100"
-            onClick={handleCallClick} // Both can go to the same call page for simplicity
+            onClick={handleVideoCallClick} // Both can go to the same call page for simplicity
           />
         </div>
       </div>
